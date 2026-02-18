@@ -16,6 +16,7 @@ export default function Dashboard() {
     const [title, setTitle] = useState("");
     const [url, setUrl] = useState("");
     const router = useRouter();
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const setup = async () => {
@@ -55,32 +56,43 @@ export default function Dashboard() {
 
 
     const fetchBookmarks = async () => {
+        setLoading(true);
+
         const { data } = await supabase
             .from("bookmarks")
             .select("*")
             .order("created_at", { ascending: false });
 
         if (data) setBookmarks(data);
+
+        setLoading(false);
     };
 
+
     const addBookmark = async () => {
-        if (!title || !url.startsWith("http")) {
-            alert("Please enter title and valid URL starting with http/https")
+        if (!title || !url) {
+            alert("Title and URL are required");
             return;
         }
 
-        await supabase.from("bookmarks").insert([
-            {
-                title,
-                url,
-                user_id: user.id,
-            },
-        ]);
+        try {
+            const validatedUrl = new URL(url);
 
-        setTitle("");
-        setUrl("");
-        fetchBookmarks();
+            await supabase.from("bookmarks").insert([
+                {
+                    title,
+                    url: validatedUrl.toString(),
+                    user_id: user.id,
+                },
+            ]);
+
+            setTitle("");
+            setUrl("");
+        } catch (error) {
+            alert("Please enter a valid URL (including https://)");
+        }
     };
+
 
     const deleteBookmark = async (id: string) => {
         await supabase.from("bookmarks").delete().eq("id", id);
@@ -116,37 +128,72 @@ export default function Dashboard() {
                 />
                 <button
                     onClick={addBookmark}
-                    className="bg-black text-white px-4 py-2 rounded cursor-pointer"
+                    className="bg-white text-black px-4 py-2 rounded cursor-pointer"
                 >
                     Add Bookmark
                 </button>
             </div>
 
             <div>
-                {bookmarks.map((bookmark) => (
-                    <div
-                        key={bookmark.id}
-                        className="border p-3 mb-2 flex justify-between items-center"
-                    >
-                        <div>
-                            <p className="font-semibold">{bookmark.title}</p>
-                            <a
-                                href={bookmark.url}
-                                target="_blank"
-                                className="text-blue-500 text-sm"
-                            >
-                                {bookmark.url}
-                            </a>
-                        </div>
-                        <button
-                            onClick={() => deleteBookmark(bookmark.id)}
-                            className="text-red-500"
-                        >
-                            Delete
-                        </button>
+                {loading ? (
+                    <div className="space-y-3">
+                        {[1, 2, 3].map((i) => (
+                            <div
+                                key={i}
+                                className="h-16 bg-gray-700 rounded animate-pulse"
+                            ></div>
+                        ))}
                     </div>
-                ))}
+                ) : bookmarks.length === 0 ? (
+                    <div className="text-gray-400 text-center py-10">
+                        <p className="text-lg">No bookmarks yet</p>
+                        <p className="text-sm mt-2">
+                            Add your first bookmark above 🚀
+                        </p>
+                    </div>
+                ) : (
+                    bookmarks.map((bookmark) => {
+                        const domain = new URL(bookmark.url).hostname;
+
+                        return (
+                            <div
+                                key={bookmark.id}
+                                className="border border-gray-700 bg-gray-800 p-3 mb-2 rounded flex justify-between items-center"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <img
+                                        src={`https://www.google.com/s2/favicons?sz=64&domain=${domain}`}
+                                        alt="favicon"
+                                        className="w-6 h-6 rounded"
+                                    />
+
+                                    <div>
+                                        <p className="font-semibold text-white">
+                                            {bookmark.title}
+                                        </p>
+                                        <a
+                                            href={bookmark.url}
+                                            target="_blank"
+                                            className="text-blue-400 text-sm"
+                                        >
+                                            {bookmark.url}
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => deleteBookmark(bookmark.id)}
+                                    className="text-red-400 hover:text-red-500 cursor-pointer"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        );
+                    })
+
+                )}
             </div>
+
         </div>
     );
 }
